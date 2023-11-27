@@ -1,0 +1,75 @@
+import requests
+from requests.exceptions import RequestException
+from xml.etree import ElementTree as ET
+
+# Define the SOAP endpoint URL for Global Weather service
+soap_url = "http://www.webservicex.net/globalweather.asmx"
+
+# SOAP request template for GetWeather operation
+soap_request_template = """<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:web="http://www.webserviceX.NET">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <web:GetWeather>
+         <!--Optional:-->
+         <web:CityName>{city}</web:CityName>
+         <!--Optional:-->
+         <web:CountryName>{country}</web:CountryName>
+      </web:GetWeather>
+   </soapenv:Body>
+</soapenv:Envelope>
+"""
+
+# Maximum number of retries
+max_retries = 3
+
+# Proxy configuration
+proxies = {
+    'http': 'http://your_proxy_url',
+    'https': 'http://your_proxy_url',
+}
+
+def send_soap_request(city, country):
+    # Retry logic
+    for retry in range(max_retries):
+        try:
+            # Build SOAP request with parameters
+            soap_request = soap_request_template.format(city=city, country=country)
+
+            # Define headers for SOAP request
+            headers = {
+                'Content-Type': 'text/xml',
+                'SOAPAction': 'http://www.webserviceX.NET/GetWeather',
+            }
+
+            # Send SOAP request using requests library with proxy
+            response = requests.post(soap_url, data=soap_request, headers=headers, proxies=proxies, timeout=10)
+
+            # Check if the request was successful (status code 200)
+            if response.status_code == 200:
+                # Parse the XML response
+                root = ET.fromstring(response.content)
+                temperature = root.find('.//Temperature').text
+                humidity = root.find('.//Humidity').text
+                wind = root.find('.//Wind').text
+                conditions = root.find('.//Conditions').text
+
+                # Print the weather details
+                print(f"Weather Details for {city}, {country}:")
+                print(f"Temperature: {temperature}")
+                print(f"Humidity: {humidity}")
+                print(f"Wind: {wind}")
+                print(f"Conditions: {conditions}")
+
+                # Break out of the retry loop if successful
+                break
+
+            else:
+                print(f"Error: HTTP Status Code {response.status_code}")
+                # Retry if the status code is not 200
+
+        except RequestException as e:
+            print(f"Error connecting to the SOAP service (Attempt {retry + 1}/{max_retries}): {e}")
+
+# Example: Get weather details for New York, USA
+send_soap_request("New York", "USA")
