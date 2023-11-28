@@ -1,0 +1,90 @@
+Server_Code
+
+import logging
+import asyncio
+from spyne import Application, rpc, ServiceBase, Integer
+from spyne.protocol.soap import Soap11
+from spyne.server.wsgi import WsgiApplication
+from waitress import serve
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+
+
+class CalculatorService(ServiceBase):
+    @rpc(Integer, Integer, _returns=Integer)
+    def Add(ctx, int_a, int_b):
+        try:
+            logging.info("add method called...")
+            logging.info(f'int_a:- {int_a}, int_b:- {int_b}')
+            result = int_a + int_b
+            return result
+        except Exception as e:
+            logging.error(f"An error occurred: {e}")
+            raise
+
+
+async def start_server():
+    logging.info("Starting SOAP server on http://localhost:8000...")
+    await asyncio.gather(
+        serve(WsgiApplication(application), host='0.0.0.0', port=8000),
+    )
+
+
+if __name__ == '__main__':
+    application = Application([CalculatorService],
+                              tns='http://tempuri.org/',
+                              in_protocol=Soap11(validator='lxml'),
+                              out_protocol=Soap11())
+
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(start_server())
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+    finally:
+        loop.close()
+
+
+
+Client_Code
+
+from zeep import Client, exceptions
+
+def perform_addition(int_a, int_b):
+    try:
+        # Define the SOAP endpoint URL for the Calculator service
+        soap_url = "http://localhost:8000/"
+
+        # Create a Zeep client
+        client = Client(soap_url + '?wsdl')
+
+        # Call the Add operation on the Calculator service
+        result = client.service.Add(int_a=int_a, int_b=int_b)
+
+        # Print the result
+        print(f"Result of adding {int_a} and {int_b}: {result}")
+
+    except exceptions.Fault as e:
+        print(f"SOAP Fault: {e}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+def main():
+    perform_addition(5, 10)
+
+if __name__ == '__main__':
+    main()
+
+
+Request Body
+
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:web="http://tempuri.org/">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <web:Add>
+         <web:int_a>15</web:int_a>
+         <web:int_b>20</web:int_b>
+      </web:Add>
+   </soapenv:Body>
+</soapenv:Envelope>
