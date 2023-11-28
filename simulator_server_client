@@ -79,43 +79,55 @@ if __name__ == '__main__':
 
 Client_Requests
 
-import requests
+import aiohttp
+import asyncio
 from xml.etree import ElementTree as ET
 
-# Define the SOAP envelope for the Add request
-soap_request = """<soapenv:Envelope
-    xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-    xmlns:web="http://tempuri.org/">
-    <soapenv:Header/>
-    <soapenv:Body>
-        <web:Add>
-            <web:int_a>5</web:int_a>
-            <web:int_b>8</web:int_b>
-        </web:Add>
-    </soapenv:Body>
-</soapenv:Envelope>"""
+async def make_soap_request(int_a, int_b):
+    # Define the SOAP envelope for the Add request
+    soap_request = f"""<soapenv:Envelope
+        xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+        xmlns:web="http://tempuri.org/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <web:Add>
+                <web:int_a>{int_a}</web:int_a>
+                <web:int_b>{int_b}</web:int_b>
+            </web:Add>
+        </soapenv:Body>
+    </soapenv:Envelope>"""
 
-# Define the SOAP endpoint
-url = 'http://localhost:8000'
+    # Define the SOAP endpoint
+    url = 'http://localhost:8000'
 
-# Set the headers for the SOAP request
-headers = {
-    'Content-Type': 'text/xml;charset=UTF-8',
-    'SOAPAction': 'http://tempuri.org/Add',  # Use the appropriate SOAPAction header
-}
+    # Set the headers for the SOAP request
+    headers = {
+        'Content-Type': 'text/xml;charset=UTF-8',
+        'SOAPAction': 'http://tempuri.org/Add',
+    }
 
-# Make the SOAP request
-response = requests.post(url, data=soap_request, headers=headers)
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post(url, data=soap_request, headers=headers) as response:
+                if response.status == 200:
+                    xml_response = ET.fromstring(await response.text())
+                    result = xml_response.find('.//{http://tempuri.org/}AddResult').text
+                    print(f"Result: {result}")
+                else:
+                    print(f"SOAP request failed with status code: {response.status}")
+                    print(await response.text())
+        except Exception as e:
+            print(f"An error occurred during the SOAP request: {e}")
 
-# Parse and print the response
-if response.status_code == 200:
-    xml_response = ET.fromstring(response.content)
-    # Use the namespace in the find method
-    result = xml_response.find('.//{http://tempuri.org/}AddResult').text
-    print(f"Result: {result}")
-else:
-    print(f"SOAP request failed with status code: {response.status_code}")
-    print(response.text)
+async def main():
+    # Example usage
+    await make_soap_request(4, 5)
+
+if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
+    loop.close()
+
 =================================
 
 
